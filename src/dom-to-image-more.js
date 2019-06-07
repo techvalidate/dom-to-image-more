@@ -42,6 +42,7 @@
      * @param {Object} options - Rendering options
      * @param {Function} options.filter - Should return true if passed node should be included in the output
      *          (excluding node means excluding it's children as well). Not called on the root node.
+     * @param {Function} options.pseudoElementFilter - Should return true to include the pseudo element for which its style is passed
      * @param {String} options.bgcolor - color for the background, any valid CSS color value.
      * @param {Number} options.width - width to be applied to node before rendering.
      * @param {Number} options.height - height to be applied to node before rendering.
@@ -58,7 +59,7 @@
         copyOptions(options);
         return Promise.resolve(node)
             .then(function(node) {
-                return cloneNode(node, options.filter, true);
+                return cloneNode(node, options.filter, options.pseudoElementFilter, true);
             })
             .then(embedFonts)
             .then(inlineImages)
@@ -196,13 +197,13 @@
         }
     }
 
-    function cloneNode(node, filter, root) {
+    function cloneNode(node, filter, pseudoElementFilter, root) {
         if (!root && filter && !filter(node)) return Promise.resolve();
 
         return Promise.resolve(node)
             .then(makeNodeCopy)
             .then(function(clone) {
-                return cloneChildren(node, clone, filter);
+                return cloneChildren(node, clone, filter, pseudoElementFilter);
             })
             .then(function(clone) {
                 return processClone(node, clone);
@@ -213,7 +214,7 @@
             return node.cloneNode(false);
         }
 
-        function cloneChildren(original, clone, filter) {
+        function cloneChildren(original, clone, filter, pseudoElementFilter) {
             var children = original.childNodes;
 
             // Include children of shadowRoot as direct children
@@ -234,7 +235,7 @@
                 children.forEach(function(child) {
                     done = done
                         .then(function() {
-                            return cloneNode(child, filter);
+                            return cloneNode(child, filter, pseudoElementFilter);
                         })
                         .then(function(childClone) {
                             if (childClone) parent.appendChild(childClone);
@@ -287,6 +288,7 @@
                     var content = style.getPropertyValue('content');
 
                     if (content === '' || content === 'none') return;
+                    if (pseudoElementFilter && !pseudoElementFilter(style)) return;
 
                     var className = util.uid();
                     var currentClass = clone.getAttribute('class');
