@@ -215,6 +215,13 @@
 
         function cloneChildren(original, clone, filter) {
             var children = original.childNodes;
+
+            // Include children of shadowRoot as direct children
+            // We currently don't handle having both chidlren and a shadowRoot
+            if (original.shadowRoot) {
+                children = original.shadowRoot.childNodes;
+            }
+
             if (children.length === 0) return Promise.resolve(clone);
 
             return cloneChildrenInOrder(clone, util.asArray(children), filter)
