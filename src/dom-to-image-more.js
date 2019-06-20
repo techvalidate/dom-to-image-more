@@ -722,7 +722,7 @@
             function getCssRules(styleSheets) {
                 var cssRules = [];
                 styleSheets.forEach(function(sheet) {
-                    if (sheet.hasOwnProperty("cssRules")) {
+                    if ('cssRules' in sheet) {
                         try {
                             util.asArray(sheet.cssRules || []).forEach(cssRules.push.bind(cssRules));
                         } catch (e) {
