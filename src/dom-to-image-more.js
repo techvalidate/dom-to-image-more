@@ -43,6 +43,7 @@
      * @param {Function} options.filter - Should return true if passed node should be included in the output
      *          (excluding node means excluding it's children as well). Not called on the root node.
      * @param {Function} options.pseudoElementFilter - Should return true to include the pseudo element for which its style is passed
+     * @param {Function} options.updateClone - Option to update cloned elements. For example, prevent custom element methods from firing
      * @param {String} options.bgcolor - color for the background, any valid CSS color value.
      * @param {Number} options.width - width to be applied to node before rendering.
      * @param {Number} options.height - height to be applied to node before rendering.
@@ -59,7 +60,7 @@
         copyOptions(options);
         return Promise.resolve(node)
             .then(function(node) {
-                return cloneNode(node, options.filter, options.pseudoElementFilter, true);
+                return cloneNode(node, options.filter, options.pseudoElementFilter, options.updateClone, true);
             })
             .then(embedFonts)
             .then(inlineImages)
@@ -197,13 +198,13 @@
         }
     }
 
-    function cloneNode(node, filter, pseudoElementFilter, root) {
+    function cloneNode(node, filter, pseudoElementFilter, updateClone, root) {
         if (!root && filter && !filter(node)) return Promise.resolve();
 
         return Promise.resolve(node)
             .then(makeNodeCopy)
             .then(function(clone) {
-                return cloneChildren(node, clone, filter, pseudoElementFilter);
+                return cloneChildren(node, clone, filter, pseudoElementFilter, updateClone);
             })
             .then(function(clone) {
                 return processClone(node, clone);
@@ -211,10 +212,14 @@
 
         function makeNodeCopy(node) {
             if (node instanceof HTMLCanvasElement) return util.makeImage(node.toDataURL());
-            return node.cloneNode(false);
+            const clone = node.cloneNode(false);
+            if (clone.shouldUpdate) {
+                updateClone && updateClone(clone);
+            }
+            return clone;
         }
 
-        function cloneChildren(original, clone, filter, pseudoElementFilter) {
+        function cloneChildren(original, clone, filter, pseudoElementFilter, updateClone) {
             var children = original.childNodes;
 
             // Include children of shadowRoot as direct children
@@ -225,17 +230,17 @@
 
             if (children.length === 0) return Promise.resolve(clone);
 
-            return cloneChildrenInOrder(clone, util.asArray(children), filter)
+            return cloneChildrenInOrder(clone, util.asArray(children), filter, pseudoElementFilter, updateClone)
                 .then(function() {
                     return clone;
                 });
 
-            function cloneChildrenInOrder(parent, children, filter) {
+            function cloneChildrenInOrder(parent, children, filter, pseudoElementFilter, updateClone) {
                 var done = Promise.resolve();
                 children.forEach(function(child) {
                     done = done
                         .then(function() {
-                            return cloneNode(child, filter, pseudoElementFilter);
+                            return cloneNode(child, filter, pseudoElementFilter, updateClone);
                         })
                         .then(function(childClone) {
                             if (childClone) parent.appendChild(childClone);
